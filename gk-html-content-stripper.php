@@ -26,7 +26,7 @@ function gk_render_html_stripper_options(){
 	<!--container for the form data-->
 	<div class="wrap">
 <?php
-	print_r($_POST);
+	
 	if(isset($_POST['proceed_cleanup'])){
 		strip_html_content();
 	}else{
