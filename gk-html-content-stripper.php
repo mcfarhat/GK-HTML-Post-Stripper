@@ -3,12 +3,15 @@
 /*
   Plugin Name: GK HTML Content Stripper
   Plugin URI: http://www.greateck.com/
-  Description: This wordpress plugin allows via a single run to remove any HTML formatting across all your posts' content, while only maintaining image and a href links as removing those might lose critical data/links
-  Version: 1.0.0
+  Description: This wordpress plugin allows via a single run to remove any HTML formatting across all your posts' content.
+  Version: 1.1.0
   Author: mcfarhat
   Author URI: http://www.greateck.com
   License: GPLv2
  */
+
+//setting initial skipped tags as img and a href
+update_option('gk-html-skipped-tags','<img><a>');
  
 /* adding relevant backend menu */
 add_action( 'admin_menu', 'gk_html_stripper_menu' );
@@ -28,6 +31,11 @@ function gk_render_html_stripper_options(){
 <?php
 	
 	if(isset($_POST['proceed_cleanup'])){
+		//store value of skipped tags
+		update_option('gk-html-skipped-tags',$_POST['skipped_tags']);
+		//store value of max date
+		$date = $_POST['max_date'];
+		update_option('gk-html-skipped-max-date',$date);
 		strip_html_content();
 	}else{
 ?>
@@ -43,8 +51,12 @@ function gk_render_html_stripper_options(){
 		</script>
 	
 		<form method="post" id="gk_html_stripper_form">
-			<div>In order to remove all HTML content from your posts, click the below button. Keep in mind img and a href tags will be maintained to avoid loss of data</div>
-			<input type="button" name="clear_posts"  id="clear_posts" value="Clear All Posts">
+			<i><div>In order to remove all HTML content from your posts, click the below button.</div>
+			<div>You can chose to keep specific tags untouched via including them below via format <tag1><tag2><tag3>...</div>
+			<div>You can also chose a specific maximum date for your posts so as only posts before this date will be affected</i><br/>
+			<label for="skipped_tags">Skipped Tags</label><input type="text" name="skipped_tags" id="skipped_tags" value="<?php echo get_option('gk-html-skipped-tags'); ?>"><br/>
+			<label for="max_date">Max Post Date</label><input type="date" name="max_date" id="max_date" value="<?php echo get_option('gk-html-skipped-max-date'); ?>"><br/>
+			<input type="button" name="clear_posts"  id="clear_posts" value="Strip Posts">
 			<input type="hidden" name="proceed_cleanup" id="proceed_cleanup">
 		</form>
 	
@@ -58,19 +70,32 @@ function gk_render_html_stripper_options(){
  
 /* function that handles stripping HTML content */
 function strip_html_content(){
+	//grab date individual components
+	$date = get_option('gk-html-skipped-max-date',$date);
 	//find posts 
 	$args = array(
         'post_type' => 'post',
 		'post_status' => 'publish',
 		'posts_per_page' => -1,
     );
+	if ($date!=""){
+		$args['date_query'] = array(
+								array(
+									'before'    => array(
+											'year'  => date('Y',strtotime($date)),
+											'month' => date('m',strtotime($date)),
+											'day'   => date('d',strtotime($date)),
+										),
+									)
+								);
+	}
 	
 	$the_query = new WP_Query($args);
 	if($the_query->have_posts() ) :
 		//loop through all posts and display ID and title of cleaned posts
+		echo 'Cleanup List:';
 		while ( $the_query->have_posts() ){ 
 			$the_query->the_post();
-			echo 'Cleanup List:';
 			echo '<li>' . get_the_ID() . ' - ' . get_the_title() .'</li>';
 			
 			//store old data under old_html_content meta
@@ -81,7 +106,7 @@ function strip_html_content(){
 			//strip the content of tags, except images and links
 			$edt_post = array(
 				'ID'           => get_the_ID(),
-				'post_content' => strip_tags($cur_content,'<img><a>'),
+				'post_content' => strip_tags($cur_content,get_option('gk-html-skipped-tags')),
 			);
 			
 			//save
